@@ -1,0 +1,48 @@
+
+# Server Port Config
+server:
+  port: 8088
+
+# Database Profile Flyway Config
+spring:
+  jpa:
+    show-sql: false
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        # current_session_context_class: org.springframework.orm.hibernate5.SpringSessionContext
+        # dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  datasource:
+    driverClassName: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/tenpo
+    username: postgres
+    password: drojasp14
+  flyway:
+    enabled: false #change true to migration
+
+login-ms:
+  baseUrl: http://login-ms:8080
+  validatePasswordPath: ${login-ms.baseUrl}/v1/login-management/login
+
+users-ms:
+  baseUrl: http://user-ms:8080
+  getUserByRut: ${users-ms.baseUrl}/v1/user-management/users/by-rut?rut={rut}
+
+bo.url: https://sac.dev.tenpo.cloud/ivr/
+bo.invalidUrl: https://multicaja.freshdesk.com/a/admin
+
+kafka:
+  listener:
+    missing-topics-fatal: false
+    auto:
+      start: false
+  bootstrap-servers: 
+  consumer:
+    group-id: ivr-worker

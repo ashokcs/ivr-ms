@@ -1,0 +1,126 @@
+stages:
+- build
+- registry
+- deploy
+
+variables:
+  MAVEN_CLI_OPTS: "--batch-mode"
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+
+build:
+  stage: build
+  image: openjdk:8-jdk
+  cache:
+    key: "$CI_COMMIT_SHORT_SHA"
+    paths:
+      - .m2/repository/ 
+      - target/*.jar
+    policy: push
+  script:
+    - chmod +x mvnw
+    - ./mvnw $MAVEN_CLI_OPTS $MAVEN_OPTS clean package -Dmaven.test.skip=true -Djacoco-skip=true --debug
+  only:
+    - dev
+    - uat
+    - master
+    
+registry:
+  stage: registry
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    #- /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.prod --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA-$BUILD_DATE
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.prod --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+  only:
+    - master
+  cache:
+    key: "$CI_COMMIT_SHORT_SHA"
+    paths:
+      - target/*.jar
+
+deployment:
+  stage: deploy
+  image: registry.gitlab.com/krealomine/deploy_k8s_azure_prod:latest
+  environment:
+    name: prod
+  variables:
+    ENVIRONMENT: prod
+    REGISTRY: tenpo-ivr-registry
+    NAMESPACE: tenpo-ivr
+    IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    COMMIT_SHA: $CI_COMMIT_SHORT_SHA
+    INTERNAL_LB: "true"
+    BO_URL: "https://clientes.tenpo.cloud/ivr/"
+  before_script:
+    - sed -i "s|_IMAGE_|$IMAGE|g" .kube.deployment.yml
+    - sed -i "s|_ENVIRONMENT_|$ENVIRONMENT|g" .kube.deployment.yml
+    - sed -i "s|_COMMIT_SHA_|$COMMIT_SHA|g" .kube.deployment.yml
+    - sed -i "s|_INTERNAL_LB_|$INTERNAL_LB|g" .kube.service.yml
+    - sed -i "s|_BO_URL_|$BO_URL|g" .kube.deployment.yml 
+  script:
+    - > 
+        kubectl create secret docker-registry $REGISTRY \
+          --namespace=$NAMESPACE \
+          --dry-run=true \
+          --docker-server=$CI_REGISTRY \
+          --docker-username=$CI_DEPLOY_USER \
+          --docker-password=$CI_DEPLOY_PASSWORD \
+          --docker-email=$GITLAB_USER_EMAIL -o yaml | kubectl apply -f -
+    - kubectl apply -f .kube.deployment.yml
+    - kubectl apply -f .kube.service.yml
+  only:
+    - master
+
+dev_kiuwan_analysis:
+  stage: build
+  image: registry.gitlab.com/tenpo/devsecops/security/kiuwan-agent:latest
+  variables:
+    KIUWAN_USER: $KIUWAN_USER
+    KIUWAN_PASSWORD: $KIUWAN_PASSWORD
+    PROJECT_NAME: $CI_PROJECT_NAME
+    TARGET_DIR: $CI_PROJECT_DIR
+    BUILD_ID: $CI_JOB_ID
+  script:
+    - baseline
+  only:
+    - dev
+
+dev_uat_registry:
+  extends: registry
+  script:
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    #- /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+  only:
+    - dev
+    - uat
+
+dev_deployment:
+  extends: deployment
+  image: registry.gitlab.com/krealomine/deploy_k8s_azure:latest
+  environment:
+    name: dev
+  variables:
+    ENVIRONMENT: dev
+    INTERNAL_LB: "false"
+    BO_URL: "https://sac.dev.tenpo.cloud/ivr/"
+    #IMAGE: $CI_REGISTRY_IMAGE:dev
+    IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+  only:
+    - dev
+
+uat_deployment:
+  extends: deployment
+  image: registry.gitlab.com/krealomine/deploy_k8s_azure_uat:latest
+  environment:
+    name: uat
+  variables:
+    ENVIRONMENT: uat
+    INTERNAL_LB: "true"
+    BO_URL: "https://sac.uat.tenpo.cloud/ivr/"
+    #IMAGE: $CI_REGISTRY_IMAGE:uat
+    IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+  only:
+    - uat

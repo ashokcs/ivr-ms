@@ -1,0 +1,6 @@
+FROM registry.gitlab.com/tenpo/docker-openjdk11-distroless-newrelic:openjdk8
+ENV NEW_RELIC_APP_NAME tenpo-ivr
+WORKDIR /app
+
+ADD target/*.jar /app/app.jar
+CMD ["app.jar"]

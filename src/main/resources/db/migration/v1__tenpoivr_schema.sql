@@ -1,0 +1,39 @@
+CREATE SCHEMA IF NOT EXISTS public;
+
+CREATE TABLE IF NOT EXISTS tenpo_user (
+	id UUID NOT NULL,
+	rut VARCHAR(20) NOT NULL,
+	email VARCHAR(70) NOT NULL,
+	status INTEGER NOT NULL,
+	created TIMESTAMP NOT NULL,
+	updated TIMESTAMP NOT NULL,
+	PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS tenpo_ivr (
+	token UUID NOT NULL,
+	user_id BIGINT NOT NULL,
+	rut VARCHAR(20) NOT NULL,
+	created_at TIMESTAMP NOT NULL,
+	expired_at TIMESTAMP NOT NULL,
+	PRIMARY KEY (token)
+);
+
+CREATE TABLE IF NOT EXISTS tenpo_ivr_interaction (
+	id BIGINT NOT NULL,
+	call_id VARCHAR(30) NOT NULL,
+	rut VARCHAR(20) NOT NULL,
+	request VARCHAR(100) NOT NULL,
+	response VARCHAR(100) NOT NULL,
+	created_at TIMESTAMP NOT NULL,
+	PRIMARY KEY (id)
+);
+
+CREATE SEQUENCE IF NOT EXISTS tenpo_ivr_interaction_id_sequence
+    AS BIGINT
+    INCREMENT BY 1
+    START WITH 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+    OWNED BY tenpo_ivr_interaction.id;

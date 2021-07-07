@@ -1,0 +1,38 @@
+kind: Service
+apiVersion: v1
+metadata:
+  namespace: tenpo-ivr
+  name: tenpo-ivr
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "_INTERNAL_LB_"
+spec:
+  selector:
+    app: tenpo-ivr
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: user-ms
+  namespace: tenpo-ivr
+spec:
+  type: ExternalName
+  externalName: user-ms.default.svc.cluster.local
+  ports:
+    - port: 8080
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: login-ms
+  namespace: tenpo-ivr
+spec:
+  type: ExternalName
+  externalName: login-ms.tenpo-login.svc.cluster.local
+  ports:
+    - port: 8080
+---
